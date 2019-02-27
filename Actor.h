@@ -1,52 +1,4 @@
 
-/*
-class StudentWorld;
-
-class Actor: public GraphObject
-{
-public:
-    Actor(StudentWorld* w, int imageID, double x, double y, int dir, int depth);
-    virtual void doSomething() = 0;
-    StudentWorld* getWorld();
-    bool checkBoundingBox(int dest_x, int dest_y);
-    virtual std::string type() = 0;
-private:
-    StudentWorld* m_studentWorld;
-    int m_upperX;
-    int m_upperY; 
-    
-};
-
-class Wall: public Actor
-{
-public:
-    Wall(StudentWorld* swp, int level_x, int level_y);
-    virtual void doSomething();
-    virtual std::string type(){return "wall";}
-private:
-};
-
-class Penelope: public Actor
-{
-public:
-    Penelope(StudentWorld* swp, int level_x, int level_y);
-    virtual void doSomething(); //I THOUGHT INHERITANCE WAS SUPPOSED TO LET ME LEAVE THIS OUT???
-    virtual std::string type(){return "Penelope";}
-private:
-};
-
-class Exit:public Actor
-{
-public:
-    Exit(StudentWorld* swp, int level_x, int level_y);
-    virtual void doSomething();
-    virtual std::string type(){return "exit";}
-private:
-};
-
-#endif // ACTOR_H_
-*/
-
 #ifndef ACTOR_INCLUDED
 #define ACTOR_INCLUDED
 
@@ -109,7 +61,7 @@ public:
     
 private:
     StudentWorld* m_studentWorld;
-    bool m_health;
+    bool m_dead;
 };
 
 class Wall : public Actor
@@ -210,6 +162,7 @@ public:
     Agent(StudentWorld* w, int imageID, double x, double y, int dir);
     virtual bool blocksMovement() const;
     virtual bool triggersOnlyActiveLandmines() const;
+    void getCloser(Actor* a, Actor* target, int& dirX, int& dirY);
     
 };
 
@@ -228,6 +181,8 @@ public:
     
     //increase infection level
     void increaseInfection(){m_infectionLevel++;}
+    
+    void move(int dir, int steps, int x, int y); 
     
 private:
     int m_infectionLevel;

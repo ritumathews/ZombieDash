@@ -28,10 +28,14 @@ int StudentWorld::init()
     m_levelFinished = false;
     m_nCitizens = 0; 
     Level curLevel(assetPath());
-    int levelNum = getLevel()+1;
+    /*
+    int levelNum = getLevel();
     std::stringstream levelNumStr;
     levelNumStr << levelNum;
     std::string levelFile = "level0" + levelNumStr.str() + ".txt";
+     */
+    std::string levelFile = "level04.txt";
+    //std::cerr << "level0" + levelNumStr.str() + ".txt" << std:: endl;
     if(curLevel.loadLevel(levelFile) == Level::load_success){
         for(int i = 0; i < LEVEL_WIDTH; i++){
             for(int j = 0; j < LEVEL_HEIGHT; j++){
@@ -81,16 +85,39 @@ int StudentWorld::init()
     return GWSTATUS_CONTINUE_GAME;
 }
 
+void StudentWorld::removeDead()
+{
+    for(int i = 0; i != m_actors.size(); i++){
+        if(m_actors[i]->isDead()){
+            delete m_actors[i];
+            m_actors.erase(m_actors.begin()+i);
+            i--;
+        }
+    }
+}
+
 int StudentWorld::move()
 {
+    if(m_levelFinished){
+        return GWSTATUS_FINISHED_LEVEL; 
+    }
+    //if penelope is dead, dec lives, if penelope has no lives, game over
+    if(m_penelope->isDead()){
+        //decLives();
+        return GWSTATUS_PLAYER_DIED;
+    }
+    
     m_penelope->doSomething();
     vector<Actor*> :: iterator it;
     it = m_actors.begin();
+    
+    removeDead();
+    
     while(it != m_actors.end()){
         (*it)->doSomething();
         it++;
     }
-    decLives();
+    //decLives();
     return GWSTATUS_CONTINUE_GAME;
 }
 void StudentWorld::cleanUp()
@@ -128,7 +155,14 @@ void StudentWorld::recordLevelFinishedIfAllCitizensGone()
 // For each actor overlapping a, activate a if appropriate.
 void StudentWorld::activateOnAppropriateActors(Actor* a)
 {
-    
+    vector<Actor*> :: iterator it;
+    it = m_actors.begin();
+    while(it != m_actors.end()){
+        if(overlap((*it), a)){
+            a->activateIfAppropriate((*it));
+        }
+        it++;
+    }
 }
 
 // Is an agent blocked from moving to the indicated location?
@@ -174,7 +208,7 @@ bool StudentWorld::locateNearestVomitTrigger(double x, double y, double& otherX,
 // if it's a zombie, false if a Penelope.
 bool StudentWorld::locateNearestCitizenTrigger(Citizen* a, double x, double y, double& otherX, double& otherY, double& distance, bool& isThreat) const
 {
-    vector<Actor*> :: iterator it;
+    vector<Actor*> :: const_iterator it;
     it = m_actors.begin();
     double distanceToPlayer = calcDistance(a, getPlayer());
     double closestZombie = sqrt(256*256 + 256*256);
@@ -223,118 +257,10 @@ double StudentWorld::calcDistance(Actor* a, Actor* b) const
     return sqrt((bX - aX)*(bX - aX) + (bY - aY)*(bY - aY));
 }
 
-/*
-
-
-GameWorld* createStudentWorld(string assetPath)
+bool StudentWorld::overlap(Actor* a, Actor* b) const
 {
-	return new StudentWorld(assetPath);
-}
-
-StudentWorld::~StudentWorld()
-{
-    cleanUp(); 
-}
-
-StudentWorld::StudentWorld(std::string assetPath)
-: GameWorld(assetPath)
-{
-}
-
-int StudentWorld::init()
-{
-    // Find Penelope's location and create her there
-    Level curLevel(assetPath());
-    int levelNum = getLevel();
-    std::stringstream levelNumStr;
-    levelNumStr << levelNum;
-    std::string levelFile = "level0" + levelNumStr.str() + ".txt";
-    int x = 0;
-    int y = 0;
-    if(curLevel.loadLevel(levelFile) == Level::load_success){
-        for(int i = 0; i < LEVEL_WIDTH; i++){
-            for(int j = 0; j < LEVEL_HEIGHT; j++){
-                //CREATE PLAYER
-                if(curLevel.getContentsOf(i, j) == Level::player){
-                    x = i;
-                    y = j;
-                    m_penelope = new Penelope(this, x, y);
-                }
-                //CREATE WALLS
-                if(curLevel.getContentsOf(i, j) == Level::wall){
-                    x = i;
-                    y = j;
-                    actorsVector.push_back(new Wall(this, x, y));
-                }
-                //CREATE EXIT
-                if(curLevel.getContentsOf(i, j) == Level::exit){
-                    x = i;
-                    y = j;
-                    actorsVector.push_back(new Exit(this, x, y));
-                }
-            }
-        }
-    }
-    return GWSTATUS_CONTINUE_GAME;
-}
-
-bool StudentWorld::checkEmpty(int x, int y)
-{
-    Level curLevel(assetPath());
-    int levelNum = getLevel();
-    std::stringstream levelNumStr;
-    levelNumStr << levelNum;
-    std::string levelFile = "level0" + levelNumStr.str() + ".txt";
-    if(curLevel.loadLevel(levelFile) == Level::load_success){
-        std::vector<Actor*> :: iterator it;
-        it = actorsVector.begin();
-        while(it != actorsVector.end()){
-            //std::cerr << "wall's Y: " << (*it)->getY() << std::endl;
-            if(((*it)->getX() <= x && x <= (*it)->getX() + SPRITE_WIDTH -1) &&
-               ((*it)->getY() <= y && y <= (*it)->getY() + SPRITE_HEIGHT -1) && (*it)->type() == "wall"){
-                return false;
-            }
-            it++;
-        }
-    }
-    return true;
-}
-
-bool StudentWorld::determineObjectOverlap(int objOneX, int objOneY, int objTwoX, int objTwoY){
-    int objOneCenterX = 2*objOneX + SPRITE_WIDTH - 1;
-    int objOneCenterY = 2*objOneY + SPRITE_HEIGHT - 1;
-    int objTwoCenterX = 2*objTwoX + SPRITE_WIDTH - 1;
-    int objTwoCenterY = 2*objTwoY + SPRITE_HEIGHT - 1;
-    int euclidDist = (objTwoCenterX - objOneCenterX)*(objTwoCenterX - objOneCenterX)
-    + (objTwoCenterY - objOneCenterY)*(objTwoCenterY - objOneCenterY);
-    if(euclidDist <= 100){
+    if((a->getX() <= b->getX() && b->getX() <= a->getX() + SPRITE_WIDTH - 1) && (a->getY() <= b->getY() && b->getY() <= a->getY() + SPRITE_HEIGHT - 1)){
         return true;
-    }else{
-        return false;
     }
+    return false;
 }
-
-int StudentWorld::move()
-{
-    m_penelope->doSomething();
-    vector<Actor*> :: iterator it;
-    it = actorsVector.begin();
-    while(it != actorsVector.end()){
-        (*it)->doSomething();
-        it++;
-    }
-    decLives();
-    return GWSTATUS_CONTINUE_GAME;
-}
-
-void StudentWorld::cleanUp()
-{
-    while(!actorsVector.empty()){
-        Actor* p = actorsVector.back();
-        delete p;
-        actorsVector.pop_back();
-    }
-    delete m_penelope;
-}
-
-*/

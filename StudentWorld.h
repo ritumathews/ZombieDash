@@ -1,36 +1,4 @@
-/*
-#ifndef STUDENTWORLD_H_
-#define STUDENTWORLD_H_
 
-#include "GameWorld.h"
-#include "Actor.h"
-#include <string>
-#include <vector>
-
-// Students:  Add code to this file, StudentWorld.cpp, Actor.h, and Actor.cpp
-
-class StudentWorld : public GameWorld
-{
-public:
-    StudentWorld(std::string assetPath);
-    ~StudentWorld(); 
-    virtual int init();
-    virtual int move();
-    virtual void cleanUp();
-    bool checkEmpty(int x, int y);
-    bool determineObjectOverlap(int objOneX, int objOneY, int objTwoX, int objTwoY);
-    Penelope* penelopePtr(){return m_penelope;}
-    std::vector <Actor*> getActorPtr() {return actorsVector;}
-
-private:
-    Penelope* m_penelope;
-    Wall* m_wall; 
-    std::vector <Actor*> actorsVector;
-};
-
-#endif // STUDENTWORLD_H_
-
-*/
 #ifndef STUDENTWORLD_INCLUDED
 #define STUDENTWORLD_INCLUDED
 
@@ -41,6 +9,7 @@ private:
 class Actor;
 class Penelope;
 class Wall;
+class Citizen;
 
 class StudentWorld : public GameWorld
 {
@@ -52,6 +21,7 @@ public:
     virtual int move();
     virtual void cleanUp();
     
+    void removeDead(); 
     // Add an actor to the world.
     void addActor(Actor* a);
     
@@ -97,6 +67,9 @@ public:
     
     //Return Penelope
     Penelope* getPlayer() const {return m_penelope;}
+    
+    //determine overlap
+    bool overlap(Actor* a, Actor* b) const; 
 private:
     Penelope* m_penelope;
     Wall* m_wall;
