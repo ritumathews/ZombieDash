@@ -59,6 +59,7 @@ public:
     // Does this object trigger citizens to follow it or flee it?
     virtual bool triggersCitizens() const;
     
+    bool launchFlame(int x, int y, int dir); 
 private:
     StudentWorld* m_studentWorld;
     bool m_dead;
@@ -77,6 +78,10 @@ class ActivatingObject : public Actor
 {
 public:
     ActivatingObject(StudentWorld* w, int imageID, double x, double y, int dir, int depth);
+    void countTick(){m_ticks++;}
+    int getTicks(){return m_ticks; }
+private:
+    int m_ticks;
 };
 
 class Exit : public ActivatingObject
@@ -102,6 +107,7 @@ public:
     Flame(StudentWorld* w, double x, double y, int dir);
     virtual void doSomething();
     virtual void activateIfAppropriate(Actor* a);
+    
 };
 
 class Vomit : public ActivatingObject
@@ -119,6 +125,10 @@ public:
     virtual void doSomething();
     virtual void activateIfAppropriate(Actor* a);
     virtual void dieByFallOrBurnIfAppropriate();
+    void blowUp(); 
+private:
+    int m_safetyTicks;
+    bool m_active; 
 };
 
 class Goodie : public ActivatingObject
@@ -163,7 +173,12 @@ public:
     virtual bool blocksMovement() const;
     virtual bool triggersOnlyActiveLandmines() const;
     void getCloser(Actor* a, Actor* target, int& dirX, int& dirY);
-    
+    bool isParalyzed(){return m_paralysis;}
+    void becomeParalyzed();
+    void move(int dir, int steps, int x, int y);
+    bool canMove(int dir, int steps, int x, int y, int& dest_x, int& dest_y);
+private:
+    bool m_paralysis;
 };
 
 class Human : public Agent
@@ -181,9 +196,6 @@ public:
     
     //increase infection level
     void increaseInfection(){m_infectionLevel++;}
-    
-    void move(int dir, int steps, int x, int y); 
-    
 private:
     int m_infectionLevel;
 };
@@ -228,13 +240,9 @@ public:
     virtual void doSomething();
     virtual void useExitIfAppropriate();
     virtual void dieByFallOrBurnIfAppropriate();
-    double dist_p();
-    double dist_z();
-    bool isParalyzed(){return m_paralysis;}
-    void becomeParalyzed();
+    void getFurther(int xCit, int yCit, int xThreat, int yThreat, int& dirX, int& dirY);
 
 private:
-    bool m_paralysis;
 };
 
 class Zombie : public Agent
@@ -243,22 +251,28 @@ public:
     Zombie(StudentWorld* w, double x, double y);
     virtual bool triggersCitizens() const;
     virtual bool threatensCitizens() const;
+    virtual void dieByFallOrBurnIfAppropriate();
+    virtual void increaseScore() = 0;
+    virtual void doSomething();
+    void computeVomit(int& x, int& y);
+    
+private:
+    int m_movementPlan;
 };
 
 class DumbZombie : public Zombie
 {
 public:
     DumbZombie(StudentWorld* w,  double x, double y);
-    virtual void doSomething();
-    virtual void dieByFallOrBurnIfAppropriate();
+    virtual void increaseScore();
 };
 
 class SmartZombie : public Zombie
 {
 public:
     SmartZombie(StudentWorld* w,  double x, double y);
-    virtual void doSomething();
-    virtual void dieByFallOrBurnIfAppropriate();
+    //virtual void doSomething();
+    virtual void increaseScore();
 };
 
 #endif // ACTOR_INCLUDED

@@ -3,10 +3,12 @@
 #include "StudentWorld.h"
 #include "GameConstants.h"
 #include <string>
+#include <iostream>
 #include <sstream>
 #include "Actor.h"
 #include "Level.h"
 #include <vector>
+#include <iomanip>
 using namespace std;
 
 GameWorld* createStudentWorld(std::string assetPath)
@@ -28,15 +30,22 @@ int StudentWorld::init()
     m_levelFinished = false;
     m_nCitizens = 0; 
     Level curLevel(assetPath());
-    /*
+    
     int levelNum = getLevel();
     std::stringstream levelNumStr;
     levelNumStr << levelNum;
+    
     std::string levelFile = "level0" + levelNumStr.str() + ".txt";
-     */
-    std::string levelFile = "level04.txt";
     //std::cerr << "level0" + levelNumStr.str() + ".txt" << std:: endl;
-    if(curLevel.loadLevel(levelFile) == Level::load_success){
+    //std::string levelFile = "level02.txt";
+    
+    if(curLevel.loadLevel(levelFile) == Level::load_fail_file_not_found || levelNum == 99){
+        return GWSTATUS_PLAYER_WON;
+        
+    }else if(curLevel.loadLevel(levelFile) == Level::load_fail_bad_format){
+        return GWSTATUS_LEVEL_ERROR;
+        
+    }else if(curLevel.loadLevel(levelFile) == Level::load_success){
         for(int i = 0; i < LEVEL_WIDTH; i++){
             for(int j = 0; j < LEVEL_HEIGHT; j++){
                 Level::MazeEntry ch = curLevel.getContentsOf(i, j);
@@ -99,6 +108,7 @@ void StudentWorld::removeDead()
 int StudentWorld::move()
 {
     if(m_levelFinished){
+        playSound(SOUND_LEVEL_FINISHED);
         return GWSTATUS_FINISHED_LEVEL; 
     }
     //if penelope is dead, dec lives, if penelope has no lives, game over
@@ -106,16 +116,13 @@ int StudentWorld::move()
         //decLives();
         return GWSTATUS_PLAYER_DIED;
     }
-    
+    gameStat(); 
     m_penelope->doSomething();
-    vector<Actor*> :: iterator it;
-    it = m_actors.begin();
     
     removeDead();
     
-    while(it != m_actors.end()){
-        (*it)->doSomething();
-        it++;
+    for(int i = 0; i < m_actors.size(); i++){
+        m_actors[i]->doSomething();
     }
     //decLives();
     return GWSTATUS_CONTINUE_GAME;
@@ -128,6 +135,7 @@ void StudentWorld::cleanUp()
         m_actors.pop_back();
     }
     delete m_penelope;
+    m_penelope = nullptr;
 }
 
 // Add an actor to the world.
@@ -136,6 +144,24 @@ void StudentWorld::addActor(Actor* a)
     m_actors.push_back(a);
 }
 
+void StudentWorld::gameStat()
+{
+    
+    ostringstream oss;
+    oss.fill('0');
+    if(getScore() < 0){
+        oss.fill(' ');
+    }
+    oss << "Score: " << setw(6) << getScore();
+    oss.fill(' ');
+    oss << setw(8) << "Level:" << setw(3) << getLevel() << setw(8) << "Lives:" << setw(3) << getLives()
+    << setw(11) << "Vaccines:" << setw(3) << getPlayer()->getNumVaccines() << setw(9) << "  Flames:" << setw(3)
+    << getPlayer()->getNumFlameCharges() << setw(8)<<"Mines:" << setw(3) << getPlayer()->getNumLandmines() << setw(10) << "  Infected: "
+    << getPlayer()->getInfectionDuration();
+    string s = oss.str();
+    
+    setGameStatText(s);
+}
 // Record that one more citizen on the current level is gone (exited,
 // died, or turned into a zombie).
 void StudentWorld::recordCitizenGone()
@@ -155,14 +181,22 @@ void StudentWorld::recordLevelFinishedIfAllCitizensGone()
 // For each actor overlapping a, activate a if appropriate.
 void StudentWorld::activateOnAppropriateActors(Actor* a)
 {
+    
     vector<Actor*> :: iterator it;
     it = m_actors.begin();
     while(it != m_actors.end()){
-        if(overlap((*it), a)){
+        if(overlap((*it), a) && (*it) != a){
             a->activateIfAppropriate((*it));
         }
         it++;
     }
+    /*
+    for(int i = 0; i < m_actors.size(); i++){
+        if(overlap(m_actors[i], a) && m_actors[i] != a){
+            a->activateIfAppropriate(m_actors[i]);
+        }
+    }
+     */
 }
 
 // Is an agent blocked from moving to the indicated location?
@@ -176,6 +210,10 @@ bool StudentWorld::isAgentMovementBlockedAt(double x, double y)
            ((*it)->getY() <= y && y <= (*it)->getY() + SPRITE_HEIGHT - 1) && (*it)->blocksMovement()){
             return true;
         }
+        if(getPlayer()->getX() <= x && x <= getPlayer()->getX() + SPRITE_WIDTH - 1 &&
+           getPlayer()->getY() <= y && y <= getPlayer()->getY() + SPRITE_HEIGHT - 1){
+            return true;
+        }
         it++;
     }
     return false;
@@ -184,6 +222,20 @@ bool StudentWorld::isAgentMovementBlockedAt(double x, double y)
 // Is creation of a flame blocked at the indicated location?
 bool StudentWorld::isFlameBlockedAt(double x, double y) const
 {
+    vector<Actor*> :: const_iterator it;
+    it = m_actors.begin();
+    while(it != m_actors.end()){
+        
+        if(((*it)->getX() <= x && x <= (*it)->getX() + SPRITE_WIDTH - 1) &&
+           ((*it)->getY() <= y && y <= (*it)->getY() + SPRITE_HEIGHT - 1) && (*it)->blocksFlame()){
+            return true;
+        }
+        if(getPlayer()->getX() <= x && x <= getPlayer()->getX() + SPRITE_WIDTH - 1 &&
+           getPlayer()->getY() <= y && y <= getPlayer()->getY() + SPRITE_HEIGHT - 1){
+            return true;
+        }
+        it++;
+    }
     return false;
 }
 
@@ -191,7 +243,17 @@ bool StudentWorld::isFlameBlockedAt(double x, double y) const
 // zombie to vomit (i.e., a human)?
 bool StudentWorld::isZombieVomitTriggerAt(double x, double y) const
 {
-    return true;
+    vector<Actor*> :: const_iterator it;
+    it = m_actors.begin();
+    while(it != m_actors.end()){
+        if((*it)->triggersZombieVomit()){
+            if((*it)->getX()/SPRITE_WIDTH == x && (*it)->getY()/SPRITE_HEIGHT == y){
+                return true;
+            }
+        }
+        it++;
+    }
+    return false;
 }
 
 // Return true if there is a living human, otherwise false.  If true,
@@ -199,7 +261,31 @@ bool StudentWorld::isZombieVomitTriggerAt(double x, double y) const
 // of the human nearest to (x,y).
 bool StudentWorld::locateNearestVomitTrigger(double x, double y, double& otherX, double& otherY, double& distance)
 {
-    return true;
+    double distanceToPlayer = calcDistance(x, y, getPlayer()->getX(), getPlayer()->getY());
+    double closestCitizen = 0;
+    vector<Actor*> :: iterator it;
+    it = m_actors.begin();
+    while(it != m_actors.end()){
+        if((*it)->triggersZombieVomit()){
+            double distanceToCitizen = calcDistance(x, y, (*it)->getX(), (*it)->getY());
+            if(distanceToCitizen <= closestCitizen){
+                closestCitizen = distanceToCitizen;
+                otherX = (*it)->getX();
+                otherY = (*it)->getY();
+                distance = distanceToCitizen;
+            }
+        }
+        it++;
+    }
+    if(distanceToPlayer < closestCitizen){
+        otherX = getPlayer()->getX();
+        otherY = getPlayer()->getY();
+        distance = distanceToPlayer;
+    }
+    if(distance <= 10)
+        return true;
+    else
+        return false; 
 }
 
 // Return true if there is a living zombie or Penelope, otherwise false.
@@ -210,11 +296,11 @@ bool StudentWorld::locateNearestCitizenTrigger(Citizen* a, double x, double y, d
 {
     vector<Actor*> :: const_iterator it;
     it = m_actors.begin();
-    double distanceToPlayer = calcDistance(a, getPlayer());
+    double distanceToPlayer = calcDistance(a->getX(), a->getY(), getPlayer()->getX(), getPlayer()->getY());
     double closestZombie = sqrt(256*256 + 256*256);
     while(it != m_actors.end()){
         if((*it)->triggersCitizens() && (*it)->threatensCitizens()){
-            double distanceToZombie = calcDistance(a, (*it));
+            double distanceToZombie = calcDistance(a->getX(), a->getY(), (*it)->getX(), (*it)->getY());
             if (distanceToZombie <= closestZombie){
                 closestZombie = distanceToZombie;
                 otherX = (*it)->getX();
@@ -232,7 +318,7 @@ bool StudentWorld::locateNearestCitizenTrigger(Citizen* a, double x, double y, d
         isThreat = true;
     }
     isThreat = false;
-    if(distance <= 80){
+    if(distanceToPlayer <= 80){
         return true;
     }else{
         return false;
@@ -247,7 +333,7 @@ bool StudentWorld::locateNearestCitizenThreat(double x, double y, double& otherX
 {
     return true;
 }
-
+/*
 double StudentWorld::calcDistance(Actor* a, Actor* b) const
 {
     double aX = ((a->getX() + SPRITE_WIDTH - 1)/2);
@@ -256,10 +342,22 @@ double StudentWorld::calcDistance(Actor* a, Actor* b) const
     double bY = ((b->getY() + SPRITE_HEIGHT - 1)/2);
     return sqrt((bX - aX)*(bX - aX) + (bY - aY)*(bY - aY));
 }
+*/
+double StudentWorld::calcDistance(int ax, int ay, int bx, int by) const
+{
+    /*
+    double aXmid = (ax + SPRITE_WIDTH - 1)/2;
+    double aYmid = (ay + SPRITE_HEIGHT - 1)/2;
+    double bXmid = (bx + SPRITE_WIDTH -1)/2;
+    double bYmid = (by + SPRITE_HEIGHT - 1)/2;
+    return sqrt((bXmid - aXmid)*(bXmid - aXmid) + (bYmid - aYmid)*(bYmid - aYmid));
+     */
+    return sqrt((bx - ax)*(bx - ax) + (by - ay) * (by - ay)); 
+}
 
 bool StudentWorld::overlap(Actor* a, Actor* b) const
 {
-    if((a->getX() <= b->getX() && b->getX() <= a->getX() + SPRITE_WIDTH - 1) && (a->getY() <= b->getY() && b->getY() <= a->getY() + SPRITE_HEIGHT - 1)){
+    if(calcDistance(a->getX(), a->getY(), b->getX(), b->getY()) <= 10){
         return true;
     }
     return false;

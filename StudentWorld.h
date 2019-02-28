@@ -21,6 +21,8 @@ public:
     virtual int move();
     virtual void cleanUp();
     
+    void gameStat();
+    
     void removeDead(); 
     // Add an actor to the world.
     void addActor(Actor* a);
@@ -63,7 +65,7 @@ public:
     bool locateNearestCitizenThreat(double x, double y, double& otherX, double& otherY, double& distance) const;
     
     // Calculate distance between two actors
-    double calcDistance(Actor* a, Actor* b) const;
+    double calcDistance(int ax, int ay, int bx, int by) const;
     
     //Return Penelope
     Penelope* getPlayer() const {return m_penelope;}
